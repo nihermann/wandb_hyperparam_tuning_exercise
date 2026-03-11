@@ -2,6 +2,17 @@
 
 In this exercise you will use [Weights & Biases (W&B)](https://wandb.ai) to systematically search for good hyperparameters for a simple image classifier.
 
+## The Dataset — CIFAR-10
+
+We train on [CIFAR-10](https://www.cs.toronto.edu/~kriz/cifar.html), a classic benchmark dataset for image classification. It contains **60 000 colour images** (32 × 32 pixels) split across **10 classes**:
+
+<p align="center">
+  <img src="https://docs.pytorch.org/tutorials/_images/cifar10.png" width="500" alt="CIFAR-10 sample images"/>
+</p>
+
+
+The images are tiny and low-resolution, which makes the task non-trivial — even for humans individual images can be hard to classify. In this exercise we intentionally use only **25 %** of the training set (~12 500 images) to make overfitting easier to observe.
+
 ## Background
 
 When training a neural network the final performance depends heavily on choices like learning rate, batch size, model size, and regularisation strength. Trying these out by hand is tedious and error-prone. **Hyperparameter sweeps** automate this process: you define a search space, and a sweep controller (here W&B) suggests configurations, runs them, and tracks the results so you can compare everything in one dashboard.
