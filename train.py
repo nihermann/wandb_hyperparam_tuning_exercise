@@ -2,14 +2,16 @@
 Minimal PyTorch training example for hyperparameter sweeps.
 
 Task:
-    FashionMNIST image classification
+    CIFAR-10 image classification with an MLP
 
 Goal for students:
-    Explore the effect of
+    1. Observe overfitting with the default (large) MLP
+    2. Use hyperparameter sweeps to find a configuration that generalizes:
         - learning rate
         - batch size
         - weight decay
         - dropout
+        - hidden layer sizes
         - learning rate schedules
 
 This script is intentionally simple so you could run it on a CPU.
@@ -30,13 +32,13 @@ import wandb
 # Default hyperparameters.
 # When running a W&B sweep these will automatically be overridden.
 config = dict(
-    batch_size=256,
+    batch_size=64,
     learning_rate=1e-3,
     weight_decay=0.0,
-    dropout=0.,
-    epochs=40,
-    filters=[32, 64, 128, 256],
-    divide_filters_by=1,  # you can set this to 2 to reduce the number of filters and make the model smaller and faster to train.
+    dropout=0.0,
+    epochs=100,
+    num_hidden_layers=3,  # number of hidden layers
+    hidden_dim=512,       # units per hidden layer (intentionally large → easy to overfit)
 )
 
 wandb.init(
@@ -45,7 +47,8 @@ wandb.init(
     # Set the wandb project where this run will be logged.
     project="param-tuning-demo",
     # Track hyperparameters and run metadata.
-    config=config
+    config=config,
+    name="MLP_BASELINE"
 )
 config = wandb.config
 
@@ -60,7 +63,7 @@ print(f"Using device: {device}")
 # ------------------------------------------------------------
 # 3. Dataset
 # ------------------------------------------------------------
-# FashionMNIST images are 28x28 grayscale images of clothing items.
+# CIFAR-10 images are 32x32 RGB images of objects (10 classes).
 
 transform = transforms.ToTensor()
 
@@ -71,14 +74,9 @@ dataset = datasets.CIFAR10(
     transform=transform,
 )
 
-# only select a subset of the classes to make the task easier and overfitting easier to observe.
-# subset_mask = (2 <= dataset.targets) & (dataset.targets <= 4)
-# dataset.data = dataset.data[subset_mask]
-# dataset.targets = dataset.targets[subset_mask]
-
 # To make overfitting easier to observe we intentionally
 # train only on a subset of the data.
-size = len(dataset.targets) // 10  # use only 10% of the data, which is ~5000 images for CIFAR10
+size = len(dataset.targets) // 4  # use only 25% of the data, which is ~1250 images for CIFAR10
 train_dataset, val_dataset, test_dataset = random_split(
     dataset,
     [int(size * 0.6), int(size * 0.2), len(dataset.targets) - int(size * 0.8)],
@@ -100,46 +98,47 @@ val_loader = DataLoader(
 # ------------------------------------------------------------
 # 4. Model
 # ------------------------------------------------------------
-# A small convolutional neural network.
-# It is intentionally slightly overparameterized for the small dataset.
-
-def conv_block(in_channels, out_channels):
-    return nn.Sequential(
-        nn.Conv2d(in_channels, out_channels, 3, padding=1),
-        nn.ReLU(),
-    )
+# A simple MLP (multi-layer perceptron).
+# It is intentionally overparameterized for the small dataset so that
+# overfitting is easy to observe.
 
 
-class SimpleCNN(nn.Module):
-    def __init__(self, dropout: float = 0.2, filters: list[int] = [32, 64, 128, 256], divide_filters_by: int = 1) -> None:
-        super(SimpleCNN, self).__init__()
+INPUT_DIM = 32 * 32 * 3  # CIFAR-10 images flattened
+NUM_CLASSES = 10
 
-        filters = [f // divide_filters_by for f in filters]
 
-        self.features = nn.Sequential(
-            conv_block(3, filters[0]),
-            conv_block(filters[0], filters[1]),
-            nn.MaxPool2d(2),
-            conv_block(filters[1], filters[2]),
-            conv_block(filters[2], filters[3]),
-            nn.MaxPool2d(2),
-        )
+class SimpleMLP(nn.Module):
+    def __init__(
+        self,
+        input_dim: int = INPUT_DIM,
+        num_hidden_layers: int = 3,
+        hidden_dim: int = 512,
+        num_classes: int = NUM_CLASSES,
+        dropout: float = 0.0,
+    ) -> None:
+        super().__init__()
 
-        self.classifier = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(filters[-1] * 8 * 8, 128),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(128, 10),
-        )
+        layers: list[nn.Module] = [nn.Flatten()]
+        prev = input_dim
+        for _ in range(num_hidden_layers):
+            layers.append(nn.Linear(prev, hidden_dim))
+            layers.append(nn.ReLU())
+            if dropout > 0:
+                layers.append(nn.Dropout(dropout))
+            prev = hidden_dim
+        layers.append(nn.Linear(prev, num_classes))
+
+        self.net = nn.Sequential(*layers)
 
     def forward(self, x):
-        x = self.features(x)
-        x = self.classifier(x)
-        return x
+        return self.net(x)
 
 
-model = SimpleCNN(config.dropout, config.filters, config.divide_filters_by).to(device)
+model = SimpleMLP(
+    num_hidden_layers=config.num_hidden_layers,
+    hidden_dim=config.hidden_dim,
+    dropout=config.dropout,
+).to(device)
 
 
 # ------------------------------------------------------------

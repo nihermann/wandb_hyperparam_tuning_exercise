@@ -1,0 +1,36 @@
+method: bayes
+metric:
+  goal: minimize
+  name: val_loss
+parameters:
+  batch_size:
+    distribution: int_uniform
+    max: 128
+    min: 32
+  num_hidden_layers:
+    values:
+    - 1
+    - 2
+    - 3
+    - 4
+  hidden_dim:
+    values:
+    - 32
+    - 64
+    - 128
+    - 256
+    - 512
+    - 1024
+  dropout:
+    distribution: uniform
+    max: 0.75
+    min: 0
+  learning_rate:
+    distribution: log_uniform_values
+    max: 0.02
+    min: 5e-05
+  weight_decay:
+    distribution: log_uniform_values
+    max: 0.01
+    min: 1e-06
+program: train.py
