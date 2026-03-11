@@ -36,6 +36,7 @@ config = dict(
     dropout=0.,
     epochs=40,
     filters=[32, 64, 128, 256],
+    divide_filters_by=1,  # you can set this to 2 to reduce the number of filters and make the model smaller and faster to train.
 )
 
 wandb.init(
@@ -110,21 +111,23 @@ def conv_block(in_channels, out_channels):
 
 
 class SimpleCNN(nn.Module):
-    def __init__(self, dropout: float = 0.2) -> None:
+    def __init__(self, dropout: float = 0.2, filters: list[int] = [32, 64, 128, 256], divide_filters_by: int = 1) -> None:
         super(SimpleCNN, self).__init__()
 
+        filters = [f // divide_filters_by for f in filters]
+
         self.features = nn.Sequential(
-            conv_block(3, config.filters[0]),
-            conv_block(config.filters[0], config.filters[1]),
+            conv_block(3, filters[0]),
+            conv_block(filters[0], filters[1]),
             nn.MaxPool2d(2),
-            conv_block(config.filters[1], config.filters[2]),
-            conv_block(config.filters[2], config.filters[3]),
+            conv_block(filters[1], filters[2]),
+            conv_block(filters[2], filters[3]),
             nn.MaxPool2d(2),
         )
 
         self.classifier = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(config.filters[-1] * 8 * 8, 128),
+            nn.Linear(filters[-1] * 8 * 8, 128),
             nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(128, 10),
@@ -136,7 +139,7 @@ class SimpleCNN(nn.Module):
         return x
 
 
-model = SimpleCNN(config.dropout).to(device)
+model = SimpleCNN(config.dropout, config.filters, config.divide_filters_by).to(device)
 
 
 # ------------------------------------------------------------
@@ -156,10 +159,10 @@ optimizer = optim.Adam(
 # ------------------------------------------------------------
 # Students can experiment by turning this on/off.
 
-# scheduler = optim.lr_scheduler.CosineAnnealingLR(
-#     optimizer,
-#     T_max=config.epochs,
-# )
+scheduler = optim.lr_scheduler.CosineAnnealingLR(
+    optimizer,
+    T_max=config.epochs,
+)
 
 
 # ------------------------------------------------------------
@@ -240,7 +243,7 @@ for epoch in range(config.epochs):
     train_loss, train_acc = train_epoch()
     val_loss, val_acc = validate()
 
-    # scheduler.step()
+    scheduler.step()
 
     # Log results to W&B so we can compare different runs
     wandb.log(
@@ -257,6 +260,7 @@ for epoch in range(config.epochs):
     print(
         f"Epoch {epoch:02d} | "
         f"train_loss={train_loss:.3f} | "
+        f"val_loss={val_loss:.3f} | "
         f"train_acc={train_acc:.3f} | "
         f"val_acc={val_acc:.3f}"
     )
