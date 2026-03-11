@@ -30,11 +30,12 @@ import wandb
 # Default hyperparameters.
 # When running a W&B sweep these will automatically be overridden.
 config = dict(
-    batch_size=64,
-    learning_rate=1e-4,
+    batch_size=256,
+    learning_rate=1e-3,
     weight_decay=0.0,
     dropout=0.,
-    epochs=20,
+    epochs=40,
+    filters=[32, 64, 128, 256],
 )
 
 wandb.init(
@@ -52,6 +53,7 @@ config = wandb.config
 # 2. Device
 # ------------------------------------------------------------
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
 
 
 # ------------------------------------------------------------
@@ -61,20 +63,25 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 transform = transforms.ToTensor()
 
-dataset = datasets.FashionMNIST(
+dataset = datasets.CIFAR10(
     root="./data",
     train=True,
     download=True,
     transform=transform,
 )
 
+# only select a subset of the classes to make the task easier and overfitting easier to observe.
+# subset_mask = (2 <= dataset.targets) & (dataset.targets <= 4)
+# dataset.data = dataset.data[subset_mask]
+# dataset.targets = dataset.targets[subset_mask]
+
 # To make overfitting easier to observe we intentionally
 # train only on a subset of the data.
-train_size = 20000
-val_size = 4000
-train_dataset, val_dataset, _ = random_split(
+size = len(dataset.targets) // 10  # use only 10% of the data, which is ~5000 images for CIFAR10
+train_dataset, val_dataset, test_dataset = random_split(
     dataset,
-    [train_size, val_size, len(dataset) - train_size - val_size],
+    [int(size * 0.6), int(size * 0.2), len(dataset.targets) - int(size * 0.8)],
+    generator=torch.Generator().manual_seed(42),
 )
 
 train_loader = DataLoader(
@@ -95,27 +102,29 @@ val_loader = DataLoader(
 # A small convolutional neural network.
 # It is intentionally slightly overparameterized for the small dataset.
 
+def conv_block(in_channels, out_channels):
+    return nn.Sequential(
+        nn.Conv2d(in_channels, out_channels, 3, padding=1),
+        nn.ReLU(),
+    )
+
+
 class SimpleCNN(nn.Module):
     def __init__(self, dropout: float = 0.2) -> None:
         super(SimpleCNN, self).__init__()
 
         self.features = nn.Sequential(
-            nn.Conv2d(1, 32, 3, padding=1),  # 28x28 -> 28x28
-            nn.ReLU(),
-            nn.Conv2d(32, 64, 3, padding=1), # 28x28 -> 28x28
-            nn.ReLU(),
-            nn.MaxPool2d(2),                 # -> 14x14
-
-            nn.Conv2d(64, 128, 3, padding=1), # -> 14x14
-            nn.ReLU(),
-            nn.Conv2d(128, 64, 3, padding=1), # -> 14x14
-            nn.ReLU(),
-            nn.MaxPool2d(2),                 # -> 7x7
+            conv_block(3, config.filters[0]),
+            conv_block(config.filters[0], config.filters[1]),
+            nn.MaxPool2d(2),
+            conv_block(config.filters[1], config.filters[2]),
+            conv_block(config.filters[2], config.filters[3]),
+            nn.MaxPool2d(2),
         )
 
         self.classifier = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(64 * 7 * 7, 128),
+            nn.Linear(config.filters[-1] * 8 * 8, 128),
             nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(128, 10),
