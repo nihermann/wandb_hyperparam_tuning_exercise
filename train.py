@@ -41,14 +41,20 @@ config = dict(
     hidden_dim=512,       # units per hidden layer (intentionally large → easy to overfit)
 )
 
+username = "<your-user-name>"
+wandb_project = "<your-project-name>"
+
+if username == "<your-user-name>" or wandb_project == "<your-project-name>":
+    raise ValueError("Please set your W&B username and project name in the config.")
+
 wandb.init(
     # Set the wandb entity where your project will be logged (generally your team name / user name).
-    entity="nihermann",
+    entity=username,
     # Set the wandb project where this run will be logged.
-    project="param-tuning-demo",
+    project=wandb_project,
     # Track hyperparameters and run metadata.
     config=config,
-    name="MLP_BASELINE"
+    name="MLP_BASELINE"  # Name of this run; remove it to get randomly generated names
 )
 config = wandb.config
 
@@ -245,16 +251,14 @@ for epoch in range(config.epochs):
     scheduler.step()
 
     # Log results to W&B so we can compare different runs
-    wandb.log(
-        {
-            "epoch": epoch,
-            "train_loss": train_loss,
-            "train_acc": train_acc,
-            "val_loss": val_loss,
-            "val_acc": val_acc,
-            "lr": optimizer.param_groups[0]["lr"],
-        }
-    )
+    wandb.log({
+        "epoch": epoch,
+        "train_loss": train_loss,
+        "train_acc": train_acc,
+        "val_loss": val_loss,
+        "val_acc": val_acc,
+        "lr": optimizer.param_groups[0]["lr"],
+    })
 
     print(
         f"Epoch {epoch:02d} | "

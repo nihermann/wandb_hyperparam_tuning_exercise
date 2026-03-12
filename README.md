@@ -133,6 +133,8 @@ Look at the sweep results and try to answer:
 2. Does a smaller model (fewer layers / smaller `hidden_dim`) generalise better?
 3. What is the effect of dropout and weight decay?
 
+If you are unsure if you results are plausible you can compare them with [my W&B Project](https://wandb.ai/nihermann/param-tuning-demo) to see if you get similar results.
+
 ## Going further
 
 You will notice that even the best MLP configuration tops out at a modest validation accuracy. This is expected — a simple MLP flattens the image and ignores all spatial structure. To push further:
