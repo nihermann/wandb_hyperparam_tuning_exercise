@@ -1,6 +1,6 @@
 # Hyperparameter Tuning with Weights & Biases
 
-In this exercise you will use [Weights & Biases (W&B)](https://wandb.ai) to systematically search for good hyperparameters for a simple image classifier.
+In this exercise you will use [Weights & Biases (W&B)](https://wandb.ai) to systematically search for good hyperparameters for a simple image classifier. The task is designed to be simple so you should be able to run everything on your Laptops CPU with training times of 1-3 minutes.
 
 ## The Dataset — CIFAR-10
 
@@ -113,7 +113,7 @@ An agent picks up configurations from the sweep controller and runs them:
 wandb agent your-entity/param-tuning-demo/<SWEEP_ID> # the command is printed when you register the sweep
 ```
 
-You can launch multiple agents in parallel to speed things up. See `launch_agents.sh` for an example and insert your run command.
+You can launch multiple agents in parallel to speed things up. See `launch_agents.sh` for an example and insert your run command. (You might have to run `chmod +x launch_agents.sh`). You can kill all agents from the `Controls` panel in your sweep page on W&B.
 
 ### Monitor results
 
